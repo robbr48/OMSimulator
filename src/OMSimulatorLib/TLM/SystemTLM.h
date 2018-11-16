@@ -76,6 +76,11 @@ namespace oms3
     SystemTLM& operator=(SystemTLM const& copy); ///< not implemented
 
   private:
+    void interpolate(TLMBusConnector* bus, double time, std::vector<double> &values);
+
+    double lastLogTime;
+    double logStep=0.001;
+
     void* model;
     std::string address = "";
     int desiredManagerPort=0;
@@ -89,8 +94,11 @@ namespace oms3
     std::mutex pluginsMutex;
     std::mutex setConnectedMutex;
     std::mutex setInitializedMutex;
+    std::mutex dataTableLock;
     std::map<System*, std::mutex> socketMutexes;
 
+    std::map<TLMBusConnector*, TLMBusConnector*> connectedbuses;
+    std::map<TLMBusConnector*, std::vector<std::vector<double> > > datatable;
     // simulation information
   };
 }

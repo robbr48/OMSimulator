@@ -41,6 +41,7 @@
 
 #include <thread>
 #include <algorithm>
+#include <unistd.h>
 
 oms3::SystemTLM::SystemTLM(const ComRef& cref, Model* parentModel, System* parentSystem)
   : oms3::System(cref, oms_system_tlm, parentModel, parentSystem)
@@ -49,6 +50,66 @@ oms3::SystemTLM::SystemTLM(const ComRef& cref, Model* parentModel, System* paren
   model = omtlm_newModel(cref.c_str());
   omtlm_setLogLevel(model, 1);
   omtlm_setNumLogStep(model, 1000);
+}
+
+void oms3::SystemTLM::interpolate(oms3::TLMBusConnector *bus, double time, std::vector<double> &values)
+{
+  dataTableLock.lock();
+  time -= bus->getDelay();
+  bool dataFound = false;
+  std::vector<std::vector<double> > *tableptr = &datatable[bus];
+  dataTableLock.unlock();
+  while(!dataFound) {
+    dataTableLock.lock();
+    dataFound = tableptr->back()[0] > time;
+    dataTableLock.unlock();
+  }
+
+  dataTableLock.lock();
+  std::vector<std::vector<double> > table = datatable[bus];
+  //dataTableLock.unlock();
+
+  int i1 = 0;
+  int i2 = 0;
+
+  if(time < table.front()[0]) {
+    values = table.front();
+  }
+  else if(time > table.back()[0]) {
+    values = table.back();
+  }
+  else {
+    while(table[i2][0] < time && i2 < table.size()-1)
+      ++i2;
+    i1 = std::max(0,i2-1);
+
+    double t1 = table[i1][0];
+    double t2 = table[i2][0];
+
+    for(int i=1; i<table[i1].size(); ++i) {
+      if(i1 == i2)
+        values.push_back(table[i1][i]);
+      else {
+        double d1 = table[i1][i];
+        double d2 = table[i2][i];
+        //std::cout << "d(" << t1 << ") = " << d1 << ", d(" << t2 << ") = " << d2 << "\n";
+        values.push_back(((time - t1) * d2 - (time - t2) * d1) / (t2 - t1));
+      }
+    }
+
+    //if(std::string(bus->getName()) == "in")
+    //std::cout << std::string(bus->getName()) << "," << t1 << "," << t2 << "," << time << "," << values[0] << "\n";
+  }
+
+  //dataTableLock.lock();
+  while(datatable[bus].size() > 2 &&
+        datatable[bus][0][0] < time-(bus->getDelay()*10) &&
+        datatable[bus][1][0] < time-(bus->getDelay()*10)) {
+    datatable[bus].erase(datatable[bus].begin());
+  }
+
+  //std::cout << "table.size() = " << datatable[bus].size() << "\n";
+  dataTableLock.unlock();
 }
 
 oms3::SystemTLM::~SystemTLM()
@@ -221,6 +282,11 @@ oms_status_enu_t oms3::SystemTLM::initialize()
   for(int i=0; connections[i]; ++i) {
     oms3_tlm_connection_parameters_t* tlmpars = connections[i]->getTLMParameters();
     omtlm_addConnection(model,connections[i]->getSignalA().c_str(),connections[i]->getSignalB().c_str(),tlmpars->delay,tlmpars->linearimpedance,tlmpars->angularimpedance,tlmpars->alpha);
+
+    TLMBusConnector *busA = getTLMBusConnector(connections[i]->getSignalA());
+    TLMBusConnector *busB = getTLMBusConnector(connections[i]->getSignalB());
+    connectedbuses[busA] = busB;
+    connectedbuses[busB] = busA;
   }
 
   return oms_status_ok;
@@ -244,8 +310,12 @@ oms_status_enu_t oms3::SystemTLM::reset()
 
 oms_status_enu_t oms3::SystemTLM::stepUntil(double stopTime, void (*cb)(const char* ident, double time, oms_status_enu_t status))
 {
-  omtlm_setStartTime(model, getModel()->getStartTime());
+  double startTime = getModel()->getStartTime();
+  omtlm_setStartTime(model, startTime);
   omtlm_setStopTime(model, stopTime);
+
+  lastLogTime = startTime;
+  logStep = (stopTime-startTime)/10000;
 
   if(getSubSystems().empty() && getComponents().empty())
     logWarning("oms3::TLMCompositeModel::stepUntil: Simulating empty model...");
@@ -324,10 +394,12 @@ oms_status_enu_t oms3::SystemTLM::connectToSockets(const oms3::ComRef cref, std:
   TLMBusConnector** tlmbuses = system->getTLMBusConnectors();
   for (int i=0; tlmbuses[i]; ++i)
   {
+      dataTableLock.lock();
       if(system->getStepSize() > tlmbuses[i]->getDelay()*0.5) {
         system->setFixedStepSize(tlmbuses[i]->getDelay()*0.5);
         logInfo("Limiting stepSize for "+std::string(getCref())+"."+std::string(tlmbuses[i]->getName())+" to "+std::to_string(system->getStepSize()));
       }
+      dataTableLock.unlock();
   }
 
   logInfo("Creating TLM plugin instance for "+std::string(cref));
@@ -414,6 +486,8 @@ oms_status_enu_t oms3::SystemTLM::setPositionAndOrientation(const oms3::ComRef &
 
 oms_status_enu_t oms3::SystemTLM::updateInitialValues(const oms3::ComRef cref)
 {
+  dataTableLock.lock();
+
   SystemWC* system = reinterpret_cast<SystemWC*>(getSystem(cref));
   if(system == nullptr)
     return logError_SubSystemNotInSystem(getCref(),cref);
@@ -427,10 +501,17 @@ oms_status_enu_t oms3::SystemTLM::updateInitialValues(const oms3::ComRef cref)
   {
     TLMBusConnector* bus = tlmbuses[i];
 
-    if(bus->getDimensions() == 1 && bus->getCausality() == oms_causality_input) {
+      if(bus->getDimensions() == 1 && bus->getCausality() == oms_causality_input) {
       oms_tlm_sigrefs_signal_t tlmrefs;
       double value;
+      //dataTableLock.lock();
       system->getReal(bus->getConnector(tlmrefs.y), value);
+      datatable[bus] = std::vector< std::vector<double> >();
+      std::vector<double> data = {-11111,value};
+      datatable[bus].push_back(data);
+      data = {getModel()->getStartTime(),value};
+      datatable[bus].push_back(data);
+      //dataTableLock.unlock();
       plugin->SetInitialValue(bus->getId(), value);
     }
     else if(bus->getDimensions() == 1 && bus->getCausality() == oms_causality_bidir &&
@@ -492,13 +573,14 @@ oms_status_enu_t oms3::SystemTLM::updateInitialValues(const oms3::ComRef cref)
     }
   }
 
+  dataTableLock.unlock();
   return oms_status_ok;
 }
 
 oms_status_enu_t oms3::SystemTLM::initializeSubSystem(oms3::ComRef cref)
 {
   oms_status_enu_t status = getSubSystem(cref)->initialize();
-  if(status = oms_status_ok)
+  if(status == oms_status_ok)
     status = updateInitialValues(cref);
   if(status == oms_status_ok) {
     setInitializedMutex.lock();
@@ -536,6 +618,13 @@ void oms3::SystemTLM::writeToSockets(SystemWC *system, double time, Component* c
       oms_tlm_sigrefs_signal_t tlmrefs;
       double value;
       system->getReal(bus->getConnector(tlmrefs.y), value);
+      if(connectedbuses.find(bus) != connectedbuses.end()) {
+        std::vector<double> temp = { time, value };
+        dataTableLock.lock();
+        //std::cout << system->getCref().c_str() << " writing x = " << value << " at t = " << time << "\n";
+        datatable[connectedbuses[bus]].push_back(temp);
+        dataTableLock.unlock();
+      }
       plugin->SetValueSignal(id, time, value);
     }
     else if(bus->getDimensions() == 1 && bus->getCausality() == oms_causality_bidir) {
@@ -575,6 +664,11 @@ void oms3::SystemTLM::writeToSockets(SystemWC *system, double time, Component* c
     }
   }
 
+  if(time >= lastLogTime+logStep && std::string(system->getCref()) == "wc1") {
+    getModel()->emit(time);
+    lastLogTime = time;
+  }
+
   socketMutexes[system].unlock();
 }
 
@@ -599,8 +693,24 @@ void oms3::SystemTLM::readFromSockets(SystemWC* system, double time, Component* 
       oms_tlm_sigrefs_signal_t tlmrefs;
 
       double value;
-      plugin->GetValueSignal(id, time, &value);
+
+      if(connectedbuses.find(bus) != connectedbuses.end()) {
+        std::vector<double> values;
+        interpolate(bus, time, values);
+        value = values[0];
+        //std::cout << system->getCref().c_str() << " interpolated, x = " << value << " at t = " << time << "\n";
+
+        double dummy;
+        plugin->GetValueSignal(id, time, &dummy);
+      }
+      else {
+        plugin->GetValueSignal(id, time, &value);
+      }
+      //std::cout << system->getCref().c_str() << "." << bus->getName().c_str() << ",,," << time << "," << value << "\n";
       bus->setReal(tlmrefs.y, value);
+
+
+
     }
     else if(bus->getDimensions() == 1 && bus->getCausality() == oms_causality_bidir &&
             bus->getInterpolation() == oms_tlm_no_interpolation) {

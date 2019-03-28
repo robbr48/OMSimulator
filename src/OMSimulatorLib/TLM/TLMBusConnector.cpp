@@ -368,10 +368,10 @@ std::vector<std::string> oms::TLMBusConnector::getVariableTypes(oms_tlm_domain_t
   if(domain == oms_tlm_domain_input || domain == oms_tlm_domain_output) {
     types = { "value" };
   }
-  else if(dimensions == 1 && interpolation == oms_tlm_no_interpolation) {
+  else if(dimensions == 1 && (interpolation == oms_tlm_no_interpolation || interpolation == oms_tlm_callbacks)) {
     types = { "state", "flow", "effort" };
   }
-  else if(dimensions == 1 && (interpolation == oms_tlm_coarse_grained || interpolation == oms_tlm_callbacks)) {
+  else if(dimensions == 1 && interpolation == oms_tlm_coarse_grained) {
     types = { "state", "flow", "wave", "impedance" };
   }
   else if(dimensions == 1 && interpolation == oms_tlm_fine_grained) {
@@ -380,13 +380,13 @@ std::vector<std::string> oms::TLMBusConnector::getVariableTypes(oms_tlm_domain_t
               "time1", "time2", "time3", "time4", "time5", "time6", "time7", "time8", "time9", "time10",
               "impedance" };
   }
-  else if(dimensions == 3 && interpolation == oms_tlm_no_interpolation) {
+  else if(dimensions == 3 && (interpolation == oms_tlm_no_interpolation || interpolation == oms_tlm_callbacks)) {
     types = { "state1", "state2", "state3",
               "A11","A12","A13","A21","A22","A23","A31","A32","A33",
               "flow1", "flow2", "flow3", "flow4", "flow5", "flow6",
               "effort1", "effort2", "effort3", "effort4", "effort5", "effort6"};
   }
-  else if(dimensions == 3 && (interpolation == oms_tlm_coarse_grained || interpolation == oms_tlm_callbacks)) {
+  else if(dimensions == 3 && interpolation == oms_tlm_coarse_grained) {
     types = { "state1", "state2", "state3",
               "A11","A12","A13","A21","A22","A23","A31","A32","A33",
               "flow1", "flow2", "flow3", "flow4", "flow5", "flow6",

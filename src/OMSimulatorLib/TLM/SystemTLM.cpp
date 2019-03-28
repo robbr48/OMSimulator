@@ -694,12 +694,22 @@ void oms::SystemTLM::readFromSockets(SystemWC* system, double time, Component* c
     }
     else if(bus->getDimensions() == 1 && bus->getCausality() == oms_causality_bidir &&
             bus->getInterpolation() == oms_tlm_callbacks) {
-        oms_tlm_sigrefs_1d_cg_t tlmrefs;
+        oms_tlm_sigrefs_1d_t tlmrefs;
 
-        double impedance, wave;
-        plugin->GetWaveImpedance1D(id, time, &impedance, &wave);
-        bus->setReal(tlmrefs.c, wave);
-        bus->setReal(tlmrefs.Z, impedance);
+        double flow,effort;
+
+        //Read position and speed from FMU
+        bus->getReal(tlmrefs.v, flow);
+
+        //Get interpolated force
+        plugin->GetForce1D(id, time, flow, &effort);
+
+        if(bus->getDomain() != oms_tlm_domain_hydraulic) {
+            effort = -effort;
+        }
+
+        //Write force to FMU
+        bus->setReal(tlmrefs.f, effort);
     }
     else if(bus->getDimensions() == 3 && bus->getCausality() == oms_causality_bidir &&
             bus->getInterpolation() == oms_tlm_no_interpolation) {

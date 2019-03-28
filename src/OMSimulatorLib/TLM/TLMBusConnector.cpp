@@ -371,7 +371,7 @@ std::vector<std::string> oms::TLMBusConnector::getVariableTypes(oms_tlm_domain_t
   else if(dimensions == 1 && interpolation == oms_tlm_no_interpolation) {
     types = { "state", "flow", "effort" };
   }
-  else if(dimensions == 1 && interpolation == oms_tlm_coarse_grained) {
+  else if(dimensions == 1 && (interpolation == oms_tlm_coarse_grained || interpolation == oms_tlm_callbacks)) {
     types = { "state", "flow", "wave", "impedance" };
   }
   else if(dimensions == 1 && interpolation == oms_tlm_fine_grained) {
@@ -386,7 +386,7 @@ std::vector<std::string> oms::TLMBusConnector::getVariableTypes(oms_tlm_domain_t
               "flow1", "flow2", "flow3", "flow4", "flow5", "flow6",
               "effort1", "effort2", "effort3", "effort4", "effort5", "effort6"};
   }
-  else if(dimensions == 3 && interpolation == oms_tlm_coarse_grained) {
+  else if(dimensions == 3 && (interpolation == oms_tlm_coarse_grained || interpolation == oms_tlm_callbacks)) {
     types = { "state1", "state2", "state3",
               "A11","A12","A13","A21","A22","A23","A31","A32","A33",
               "flow1", "flow2", "flow3", "flow4", "flow5", "flow6",
@@ -473,7 +473,7 @@ std::vector<std::string> oms::TLMBusConnector::getVariableDescriptions(oms_tlm_d
   else if(dimensions == 1 && interpolation == oms_tlm_no_interpolation) {
     types = { state, flow, effort };
   }
-  else if(dimensions == 1 && interpolation == oms_tlm_coarse_grained) {
+  else if(dimensions == 1 && (interpolation == oms_tlm_coarse_grained || interpolation == oms_tlm_callbacks)) {
     types = { state, flow, wave, impedance };
   }
   else if(dimensions == 1 && interpolation == oms_tlm_fine_grained) {
@@ -504,7 +504,7 @@ std::vector<std::string> oms::TLMBusConnector::getVariableDescriptions(oms_tlm_d
     types.push_back(roteffort+" (y-axis)");
     types.push_back(roteffort+" (z-axis)");
   }
-  else if(dimensions == 3 && interpolation == oms_tlm_coarse_grained) {
+  else if(dimensions == 3 && (interpolation == oms_tlm_coarse_grained || interpolation == oms_tlm_callbacks)) {
     types = { state+" (x-axis)", state+" (y-axis)", state+" (z-axis)"};
     for(int i=1; i<=3; ++i)
       for(int j=1;j<=3; ++j)

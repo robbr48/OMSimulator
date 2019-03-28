@@ -38,6 +38,7 @@
 #include "System.h"
 #include "SystemTLM.h"
 #include "SystemWC.h"
+#include "Scope.h"
 #include <fmilib.h>
 #include <JM/jm_portability.h>
 #include <OMSFileSystem.h>
@@ -145,7 +146,7 @@ oms::Component* oms::ComponentFMUCS::NewComponent(const oms::ComRef& cref, oms::
   component->callbackFunctions.allocateMemory = calloc;
   component->callbackFunctions.freeMemory = free;
   component->callbackFunctions.componentEnvironment = component->fmu;
-  component->callbackFunctions.stepFinished = NULL;
+  component->callbackFunctions.stepFinished = component->stepFinished;
 
   // create a list of all variables
   fmi2_import_variable_list_t *varList = fmi2_import_get_variable_list(component->fmu, 0);
@@ -422,6 +423,8 @@ oms_status_enu_t oms::ComponentFMUCS::instantiate()
   jmstatus = fmi2_import_create_dllfmu(fmu, fmi2_fmu_kind_cs, &callbackFunctions);
   if (jm_status_error == jmstatus)
     return logError("Could not create the DLL loading mechanism (C-API). Error: " + std::string(fmi2_import_get_last_error(fmu)));
+
+  oms::Scope::GetInstance().registerComponentByFMU(fmu,this);
 
   jmstatus = fmi2_import_instantiate(fmu, getCref().c_str(), fmi2_cosimulation, NULL, fmi2_false);
   if (jm_status_error == jmstatus)
@@ -946,4 +949,27 @@ oms_status_enu_t oms::ComponentFMUCS::removeSignalsFromResults(const char* regex
   }
 
   return oms_status_ok;
+}
+
+void oms::ComponentFMUCS::stepFinished(void *environment, fmi2_status_t status)
+{
+    Component* component;
+    oms_status_enu_t oms_status = oms::Scope::GetInstance().getComponentByFMU(environment, &component);
+
+    if(oms_status_ok == oms_status) {
+        System *system = component->getParentSystem();
+        if(system->getParentSystem() && system->getParentSystem()->getType() == oms_system_tlm) {
+            SystemWC *wcsystem = reinterpret_cast<SystemWC*>(system);
+            SystemTLM *tlmsystem = reinterpret_cast<SystemTLM*>(system->getParentSystem());
+            double intermediateTime;
+            if(oms_status_ok == component->getReal("intermediateTime", intermediateTime)) {
+                if(status == fmi2Warning) {
+                    tlmsystem->writeToSockets(wcsystem, intermediateTime, component);
+                }
+                else {
+                    tlmsystem->readFromSockets(wcsystem, intermediateTime, component);
+                }
+            }
+        }
+    }
 }

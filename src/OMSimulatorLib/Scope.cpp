@@ -326,6 +326,21 @@ oms_status_enu_t oms::Scope::getElements(const oms::ComRef& cref, oms::Element**
   return oms_status_error;
 }
 
+oms_status_enu_t oms::Scope::registerComponentByFMU(void* fmu, Component* component)
+{
+    fmuToComponentMap[fmu] = component;
+    return oms_status_ok;
+}
+
+oms_status_enu_t oms::Scope::getComponentByFMU(void* fmu, Component** component)
+{
+    if(fmuToComponentMap.find(fmu) == fmuToComponentMap.end()) {
+        return oms_status_error;
+    }
+    (*component) = fmuToComponentMap[fmu];
+    return oms_status_ok;
+}
+
 oms::Model* oms::Scope::getModel(const oms::ComRef& cref)
 {
   auto it = models_map.find(cref);

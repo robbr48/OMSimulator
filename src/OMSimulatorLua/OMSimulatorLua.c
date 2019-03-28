@@ -1543,6 +1543,8 @@ DLLEXPORT int luaopen_OMSimulatorLua(lua_State *L)
   lua_setglobal(L, "coarsegrained");
   lua_pushnumber(L, 2);
   lua_setglobal(L, "finegrained");
+  lua_pushnumber(L, 3);
+  lua_setglobal(L, "callbacks");
 
   // oms_solver_enu_t
   REGISTER_LUA_ENUM(oms_solver_sc_explicit_euler);

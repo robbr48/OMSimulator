@@ -43,6 +43,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include <FMI2/fmi2FunctionTypes.h>
+
 namespace oms
 {
   class System;
@@ -86,6 +88,8 @@ namespace oms
     oms_status_enu_t updateSignals(ResultWriter& resultWriter);
     oms_status_enu_t addSignalsToResults(const char* regex);
     oms_status_enu_t removeSignalsFromResults(const char* regex);
+
+    static void stepFinished(void* environment, fmi2_status_t status);
 
   protected:
     ComponentFMUCS(const ComRef& cref, System* parentSystem, const std::string& fmuPath);

@@ -69,7 +69,8 @@ typedef enum {
 typedef enum {
   oms_tlm_no_interpolation,
   oms_tlm_coarse_grained,
-  oms_tlm_fine_grained
+  oms_tlm_fine_grained,
+  oms_tlm_callbacks
 } oms_tlm_interpolation_t;
 
 typedef enum {

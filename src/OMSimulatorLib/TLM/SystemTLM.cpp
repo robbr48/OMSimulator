@@ -442,7 +442,7 @@ oms_status_enu_t oms::SystemTLM::updateInitialValues(const oms::ComRef cref)
       plugin->SetInitialValue(bus->getId(), value);
     }
     else if(bus->getDimensions() == 1 && bus->getCausality() == oms_causality_bidir &&
-            bus->getInterpolation() == oms_tlm_coarse_grained) {
+            (bus->getInterpolation() == oms_tlm_coarse_grained || bus->getInterpolation() == oms_tlm_callbacks)) {
       oms_tlm_sigrefs_1d_cg_t tlmrefs;
       double effort,flow;
       bus->getReal(tlmrefs.c, effort);
@@ -472,7 +472,7 @@ oms_status_enu_t oms::SystemTLM::updateInitialValues(const oms::ComRef cref)
       plugin->SetInitialFlow3D(bus->getId(), flow[0], flow[1], flow[2], flow[3], flow[4], flow[5]);
     }
     else if(bus->getDimensions() == 3 && bus->getCausality() == oms_causality_bidir &&
-            bus->getInterpolation() == oms_tlm_coarse_grained) {
+            (bus->getInterpolation() == oms_tlm_coarse_grained || bus->getInterpolation() == oms_tlm_callbacks)) {
       oms_tlm_sigrefs_3d_cg_t tlmrefs;
       std::vector<double> effort(6,0);
       std::vector<double> flow(6,0);
@@ -692,6 +692,15 @@ void oms::SystemTLM::readFromSockets(SystemWC* system, double time, Component* c
 
       bus->setReal(tlmrefs.Z, impedance);
     }
+    else if(bus->getDimensions() == 1 && bus->getCausality() == oms_causality_bidir &&
+            bus->getInterpolation() == oms_tlm_callbacks) {
+        oms_tlm_sigrefs_1d_cg_t tlmrefs;
+
+        double impedance, wave;
+        plugin->GetWaveImpedance1D(id, time, &impedance, &wave);
+        bus->setReal(tlmrefs.c, wave);
+        bus->setReal(tlmrefs.Z, impedance);
+    }
     else if(bus->getDimensions() == 3 && bus->getCausality() == oms_causality_bidir &&
             bus->getInterpolation() == oms_tlm_no_interpolation) {
 
@@ -756,6 +765,16 @@ void oms::SystemTLM::readFromSockets(SystemWC* system, double time, Component* c
 
       bus->setReal(tlmrefs.Zt, Zt);
       bus->setReal(tlmrefs.Zr, Zr);
+    }
+    else if(bus->getDimensions() == 3 && bus->getCausality() == oms_causality_bidir &&
+            bus->getInterpolation() == oms_tlm_callbacks) {
+        oms_tlm_sigrefs_3d_cg_t tlmrefs;
+        std::vector<double> waves(6,0);
+        double Zt, Zr;
+        plugin->GetWaveImpedance3D(id, time, &Zt, &Zr, &waves[0]);
+        bus->setReals(tlmrefs.c, waves);
+        bus->setReal(tlmrefs.Zt, Zt);
+        bus->setReal(tlmrefs.Zr, Zr);
     }
   }
 

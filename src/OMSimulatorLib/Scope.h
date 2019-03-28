@@ -69,9 +69,11 @@ namespace oms
     oms_status_enu_t getElement(const ComRef& cref, oms::Element** element);
     oms_status_enu_t getElements(const ComRef& cref, oms::Element*** elements);
     Model* getModel(const ComRef& cref);
-
     const std::string& getTempDirectory() const {return GetInstance().tempDir;}
     std::string getWorkingDirectory();
+
+    oms_status_enu_t registerComponentByFMU(void *fmu, Component *component);
+    oms_status_enu_t getComponentByFMU(void *fmu, Component **component);
 
   protected:
     static oms_status_enu_t miniunz(const std::string& filename, const std::string& extractdir, bool systemStructure);
@@ -81,6 +83,8 @@ namespace oms
     std::map<ComRef, unsigned int> models_map;
 
     std::string tempDir;
+
+    std::map<void*, Component*> fmuToComponentMap;
   };
 }
 

@@ -585,6 +585,8 @@ oms_status_enu_t oms::System::importFromSSD(const pugi::xml_node& node)
                 interpolation = oms_tlm_coarse_grained;
               else if (interpolationstr == "finegrained")
                 interpolation = oms_tlm_fine_grained;
+              else if(interpolationstr == "callbacks")
+                interpolation = oms_tlm_callbacks;
               else
                 return logError("Unsupported interpolation type: "+interpolationstr);
 

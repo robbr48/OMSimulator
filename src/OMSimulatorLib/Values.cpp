@@ -36,6 +36,7 @@
 #include "ssd/Tags.h"
 #include "Util.h"
 #include "XercesValidator.h"
+#include "dcp/zip/DcpSlaveReader.hpp"
 
 #include <iostream>
 #include <map>
@@ -1875,6 +1876,14 @@ oms_status_enu_t oms::Values::parseModelDescriptionFmi3(const filesystem::path& 
     }
   }
   return oms_status_ok;
+}
+
+oms_status_enu_t oms::Values::parseSlaveDescription(const std::string &dcpPath)
+{
+    std::shared_ptr<SlaveDescription_t> desc = getSlaveDescriptionFromDcpFile(1, 0, dcpPath);
+
+    // TODO: Implement (dcp)
+    return oms_status_fatal;
 }
 
 void oms::Values::parseModelStructureDependencies(std::string &dependencies, std::vector<int> &dependencyList)

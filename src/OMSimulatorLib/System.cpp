@@ -34,6 +34,7 @@
 #include "Component.h"
 #include "ComponentFMUCS.h"
 #include "ComponentFMU3CS.h"
+#include "ComponentDCP.h"
 #include "ComponentFMUME.h"
 #include "ComponentTable.h"
 #include "Flags.h"
@@ -305,6 +306,8 @@ oms_status_enu_t oms::System::addSubModel(const oms::ComRef& cref, const std::st
 
     if (extension == ".fmu" && oms_system_wc == type && fmiVersion == "2.0")
       component = ComponentFMUCS::NewComponent(cref, this, path_.string());
+    else if (extension == ".dcp" && oms_system_wc == type)
+      component = ComponentDCP::NewComponent(cref, this, path_.string());
     else if (extension == ".fmu" && oms_system_wc == type && fmiVersion == "3.0")
       component = ComponentFMU3CS::NewComponent(cref, this, path_.string());
     else if (extension == ".fmu" && oms_system_sc == type)
